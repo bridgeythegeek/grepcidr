@@ -9,12 +9,18 @@ class GrepCIDR:
 
     _rx_IPv4 = r'(?:(?:\d|[01]?\d\d|2[0-4]\d|25[0-5])\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d|\d)(?:\/\d{1,2})?'
 
-    def __init__(self, haystacks, f, e, o, h):
+    def __init__(self, haystacks, f, e, o, h, p):
 
         self._haystacks = [haystacks] if isinstance(haystacks, str) else haystacks
         self._needles   = []
         self._o = o
-        self._format = '{1}' if h else '{0}:{1}'
+        self._p = p
+
+        self._format = '{2}'
+        if p:
+            self._format = '{1}:{2}'
+        if not h:
+            self._format = f"{{0}}:{self._format}"
 
         self.add_needles_from_files(f)
         self.add_needles_from_str(e)
@@ -48,8 +54,9 @@ class GrepCIDR:
             with open(haystack, 'r') as f:
                 for line in f:
                     for match in self.rx_IPv4.finditer(line):
-                        if any([ipaddress.ip_address(match[0]) in net for net in self._needles]):
-                            print(self._format.format(haystack, match[0] if self._o else line.rstrip()))
+                        for net in self._needles:
+                            if ipaddress.ip_address(match[0]) in net:
+                                print(self._format.format(haystack, net, match[0] if self._o else line.rstrip()))
 
 
 if __name__ == '__main__':
@@ -59,6 +66,7 @@ if __name__ == '__main__':
     argp.add_argument('-f', action='append',
             help='read CIDRs from this file')
     argp.add_argument('-e', action='append', help='CIDRs')
+    argp.add_argument('-p', action='store_true', help='Include pattern that matched in the output.')
     argp.add_argument('-o', action='store_true',
             help='output the matching IP address only, not the whole line')
     argp.add_argument('--no-file', action='store_true',
@@ -69,5 +77,5 @@ if __name__ == '__main__':
         sys.stderr.write('Error: CIDR not provided\n')
         sys.exit(1)
 
-    grepcidr = GrepCIDR(args.file, args.f, args.e, args.o, args.no_file)
+    grepcidr = GrepCIDR(args.file, args.f, args.e, args.o, args.no_file, args.p)
     grepcidr.search()
